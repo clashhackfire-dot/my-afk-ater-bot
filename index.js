@@ -9,85 +9,77 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-const MC_HOST = process.env.MC_HOST || 'localhost';
-const MC_PORT = parseInt(process.env.MC_PORT) || 25565;
-const USERNAME = process.env.BOT_USERNAME || 'DashboardBot';
-const AUTH = process.env.BOT_AUTH || 'offline'; // 'microsoft' for premium
+
+const botConfig = {
+  host: process.env.MC_HOST || 'localhost',
+  port: parseInt(process.env.MC_PORT) || 25565,
+  username: process.env.BOT_USERNAME || 'DashboardBot',
+  auth: process.env.BOT_AUTH || 'offline',
+  version: false,
+  keepAlive: true,
+  checkTimeoutInterval: 30000
+};
 
 let bot = null;
 let isConnected = false;
 
-// Serve static dashboard (we'll add HTML/JS)
 app.use(express.static(path.join(__dirname, 'public')));
-
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Socket.io for real-time
-io.on('connection', (socket) => {
-  console.log('Dashboard client connected');
-  socket.emit('status', { connected: isConnected });
+function createBot() {
+  if (bot) {
+    try { bot.quit(); } catch (e) {}
+    bot = null;
+  }
 
-  socket.on('sendCommand', (cmd) => {
-    if (bot && isConnected) {
-      bot.chat(cmd);
-    }
-  });
-
-  socket.on('reconnectBot', startBot);
-});
-
-// Start the bot
-function startBot() {
-  if (bot) bot.quit();
-
-  bot = mineflayer.createBot({
-    host: MC_HOST,
-    port: MC_PORT,
-    username: USERNAME,
-    auth: AUTH,
-    version: false // auto-detect
-  });
+  console.log('Creating new bot...');
+  bot = mineflayer.createBot(botConfig);
 
   bot.on('spawn', () => {
-    console.log('Bot spawned!');
+    console.log(`✅ Bot ${bot.username} spawned!`);
     isConnected = true;
-    io.emit('status', { connected: true, position: bot.entity.position });
-    bot.chat('Hello! Dashboard bot online.');
+    io.emit('status', { connected: true, username: bot.username });
+    bot.chat('✅ Bot online via Render dashboard!');
   });
 
   bot.on('chat', (username, message) => {
-    if (username !== bot.username) {
-      io.emit('chat', { username, message });
-    }
+    if (username !== bot.username) io.emit('chat', { username, message });
   });
 
   bot.on('kicked', (reason) => {
     console.log('Kicked:', reason);
     isConnected = false;
     io.emit('status', { connected: false });
-    setTimeout(startBot, 5000); // auto-reconnect
+    setTimeout(createBot, 10000);
   });
 
-  bot.on('end', () => {
+  bot.on('end', (reason) => {
+    console.log('Disconnected:', reason);
     isConnected = false;
     io.emit('status', { connected: false });
-    setTimeout(startBot, 10000);
+    setTimeout(createBot, 15000);
   });
 
-  // Basic events
-  bot.on('health', () => {
-    io.emit('stats', {
-      health: bot.health,
-      food: bot.food,
-      position: bot.entity?.position
-    });
+  bot.on('error', (err) => {
+    console.error('Error:', err.message);
+    io.emit('status', { connected: false, error: err.message });
   });
 }
 
-startBot(); // Start immediately
+io.on('connection', (socket) => {
+  socket.emit('status', { connected: isConnected });
+
+  socket.on('sendCommand', (cmd) => {
+    if (bot && isConnected) bot.chat(cmd);
+  });
+
+  socket.on('reconnectBot', createBot);
+});
+
+createBot(); // Start bot
 
 server.listen(PORT, () => {
-  console.log(`Dashboard running on http://localhost:${PORT}`);
+  console.log(`Dashboard running on port ${PORT}`);
 });

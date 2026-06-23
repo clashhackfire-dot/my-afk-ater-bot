@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mineflayer Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { background: #0f172a; color: #e2e8f0; }
+    .chat-log { max-height: 400px; overflow-y: auto; scrollbar-width: thin; }
+  </style>
+</head>
+<body class="min-h-screen p-4">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-4xl font-bold text-cyan-400 mb-8 text-center">🚀 MINECRAFT BOT DASHBOARD</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Status -->
+      <div class="bg-slate-900 p-6 rounded-2xl border border-cyan-500/30">
+        <h2 class="text-xl font-semibold mb-4">Bot Status</h2>
+        <div id="status" class="text-2xl font-mono">Disconnected</div>
+        <button onclick="reconnect()" class="mt-4 px-6 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl">Reconnect</button>
+      </div>
+
+      <!-- Stats -->
+      <div class="bg-slate-900 p-6 rounded-2xl border border-cyan-500/30">
+        <h2 class="text-xl font-semibold mb-4">Stats</h2>
+        <div id="stats" class="space-y-2 font-mono text-sm"></div>
+      </div>
+
+      <!-- Controls -->
+      <div class="bg-slate-900 p-6 rounded-2xl border border-cyan-500/30">
+        <h2 class="text-xl font-semibold mb-4">Send Command</h2>
+        <input id="command" type="text" placeholder="/say Hello" class="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 focus:border-cyan-400 outline-none">
+        <button onclick="sendCmd()" class="mt-3 w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-medium">Send</button>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="mt-8 bg-slate-900 p-6 rounded-2xl border border-cyan-500/30">
+      <h2 class="text-xl font-semibold mb-4">Live Chat</h2>
+      <div id="chat" class="chat-log bg-black/50 p-4 rounded-xl h-96 font-mono text-sm overflow-y-auto"></div>
+      <input id="chatInput" type="text" placeholder="Type message..." class="mt-4 w-full bg-slate-800 p-3 rounded-xl" onkeypress="if(event.key==='Enter') sendChat()">
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let botConnected = false;
+
+    socket.on('status', (data) => {
+      botConnected = data.connected;
+      document.getElementById('status').innerHTML = data.connected ? 
+        `<span class="text-emerald-400">🟢 ONLINE</span>` : 
+        `<span class="text-red-400">🔴 OFFLINE</span>`;
+      if (data.position) updateStats(data);
+    });
+
+    socket.on('chat', (msg) => {
+      const chat = document.getElementById('chat');
+      chat.innerHTML += `<div><span class="text-cyan-400">${msg.username}:</span> ${msg.message}</div>`;
+      chat.scrollTop = chat.scrollHeight;
+    });
+
+    socket.on('stats', updateStats);
+
+    function updateStats(data) {
+      document.getElementById('stats').innerHTML = `
+        Health: ${data.health || 'N/A'} ❤️<br>
+        Food: ${data.food || 'N/A'} 🍖<br>
+        Pos: ${data.position ? JSON.stringify(data.position) : 'N/A'}
+      `;
+    }
+
+    function sendCmd() {
+      const cmd = document.getElementById('command').value;
+      if (cmd) socket.emit('sendCommand', cmd);
+      document.getElementById('command').value = '';
+    }
+
+    function sendChat() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value;
+      if (msg) {
+        socket.emit('sendCommand', msg);
+        input.value = '';
+      }
+    }
+
+    function reconnect() {
+      socket.emit('reconnectBot');
+    }
+
+    // Tailwind script already included
+  </script>
+</body>
+</html>

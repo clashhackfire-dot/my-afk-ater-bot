@@ -1,19 +1,13 @@
 {
   "name": "minecraft-mineflayer-dashboard",
   "version": "1.0.0",
-  "description": "24/7 Mineflayer bot with sick web dashboard",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "setup": "npm install"
+    "start": "node index.js"
   },
   "dependencies": {
     "express": "^4.21.0",
     "mineflayer": "^4.26.0",
     "socket.io": "^4.8.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.7"
   }
 }
